@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+python-dotenv
+pydantic[email]
+alembic
+python-jose[cryptography]
+bcrypt
+openai
+pgvector
+dateparser
+twilio
+deepgram-sdk
+httpx
+python-multipart
+groq
