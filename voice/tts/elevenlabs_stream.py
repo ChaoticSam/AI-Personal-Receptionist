@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 _TTS_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream"
 
 # Bytes per chunk sent to Twilio. Twilio handles variable chunk sizes fine.
-_CHUNK_SIZE = 4096
+_CHUNK_SIZE = 160
 
 
 async def stream_tts_to_twilio(
@@ -55,7 +55,7 @@ async def stream_tts_to_twilio(
         print("[TTS] ELEVENLABS_VOICE_ID not configured — TTS disabled.")
         return False
 
-    url = _TTS_URL.format(voice_id=vid)
+    url = _TTS_URL.format(voice_id=vid) + "?output_format=ulaw_8000"
     headers = {
         "xi-api-key": ELEVENLABS_API_KEY,
         "Content-Type": "application/json",
@@ -63,7 +63,6 @@ async def stream_tts_to_twilio(
     payload = {
         "text": text,
         "model_id": mid,
-        "output_format": "ulaw_8000",   # µ-law 8kHz — native Twilio format
         "voice_settings": {
             "stability": 0.5,
             "similarity_boost": 0.75,
