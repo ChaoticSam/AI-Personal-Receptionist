@@ -162,6 +162,7 @@ async def voice_stream(websocket: WebSocket):
       SPEAKING   → TTS streaming; audio dropped
     """
     await websocket.accept()
+    print("[Gateway] WebSocket accepted — waiting for first message from Twilio...")
 
     voice_session : VoiceCallSession | None = None
     dg_stream     : DeepgramStream    | None = None
@@ -192,13 +193,20 @@ async def voice_stream(websocket: WebSocket):
             except WebSocketDisconnect:
                 print("[Gateway] WebSocket disconnected by Twilio")
                 break
+            except Exception as exc:
+                print(f"[Gateway] receive_text error ({type(exc).__name__}): {exc}")
+                break
+
+            print(f"[Gateway] Raw message received (len={len(raw)}): {raw[:120]}")
 
             try:
                 msg   = json.loads(raw)
             except json.JSONDecodeError:
+                print(f"[Gateway] JSON decode failed for: {raw[:120]}")
                 continue
 
             event = msg.get("event")
+            print(f"[Gateway] Event: {event}")
 
             # ── start ────────────────────────────────────────────────
             if event == "start":
