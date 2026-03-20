@@ -117,6 +117,7 @@ class Orchestrator:
             print(f"[Orchestrator] Greeting TTS error: {exc}")
         finally:
             voice_session.state = VoiceState.LISTENING
+            print(f"[Orchestrator] Greeting done — state set to LISTENING")
 
     async def end_call(self, voice_session: VoiceCallSession) -> None:
         """Persist transcript to DB and remove the AI session."""

@@ -34,3 +34,6 @@ ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "")
 ELEVENLABS_MODEL_ID = os.getenv("ELEVENLABS_MODEL_ID", "eleven_turbo_v2_5")
 SERVER_BASE_URL = os.getenv("SERVER_BASE_URL", "http://localhost:8000")
+
+# Log every Twilio→Deepgram chunk at INFO (very verbose). Default: first chunk INFO, rest DEBUG.
+VOICE_STT_LOG_EACH_CHUNK = os.getenv("VOICE_STT_LOG_EACH_CHUNK", "").lower() in ("1", "true", "yes")

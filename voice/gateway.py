@@ -30,14 +30,14 @@ Two endpoints:
 import asyncio
 import base64
 import json
-from typing import List
+import logging
 
 import httpx
 from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from app.config import SERVER_BASE_URL, ELEVENLABS_API_KEY
+from app.config import ELEVENLABS_API_KEY, SERVER_BASE_URL, VOICE_STT_LOG_EACH_CHUNK
 from app.db.dependencies import get_db, get_current_user
 from app.services.business_service import get_business_by_phone
 
@@ -47,6 +47,8 @@ from voice.stt.deepgram_stream import DeepgramStream
 from voice.orchestrator import orchestrator
 
 router = APIRouter(tags=["voice-gateway"])
+# Logs only Twilio→Deepgram audio forwards (see media handler) and Deepgram text (voice/stt/deepgram_stream.py).
+stt_pipeline_log = logging.getLogger("voice.stt.pipeline")
 
 
 # ── 1. TwiML Webhook ────────────────────────────────────────────────────────
@@ -93,7 +95,6 @@ async def voice_webhook(request: Request, db: Session = Depends(get_db)):
   </Connect>
 </Response>"""
 
-    print(f"[Gateway] Webhook: caller={caller} → business={business.name} ws={ws_url}")
     return Response(content=twiml, media_type="application/xml")
 
 
@@ -162,7 +163,6 @@ async def voice_stream(websocket: WebSocket):
       SPEAKING   → TTS streaming; audio dropped
     """
     await websocket.accept()
-    print("[Gateway] WebSocket accepted — waiting for first message from Twilio...")
 
     voice_session : VoiceCallSession | None = None
     dg_stream     : DeepgramStream    | None = None
@@ -191,10 +191,9 @@ async def voice_stream(websocket: WebSocket):
             try:
                 raw = await websocket.receive_text()
             except WebSocketDisconnect:
-                print("[Gateway] WebSocket disconnected by Twilio")
                 break
             except Exception as exc:
-                print(f"[Gateway] receive_text error ({type(exc).__name__}): {exc}")
+                stt_pipeline_log.warning("WebSocket receive_text error (%s): %s", type(exc).__name__, exc)
                 break
 
             try:
@@ -204,9 +203,6 @@ async def voice_stream(websocket: WebSocket):
 
             event = msg.get("event")
 
-            if event not in ("media",):
-                print(f"[Gateway] Event: {event}")
-
             # ── start ────────────────────────────────────────────────
             if event == "start":
                 start_data  = msg.get("start", {})
@@ -215,11 +211,6 @@ async def voice_stream(websocket: WebSocket):
                 business_id = params.get("business_id", "")
                 caller_phone= params.get("caller_phone", "")
                 call_sid    = params.get("call_sid", "")
-
-                print(
-                    f"[Gateway] Stream started: sid={stream_sid} "
-                    f"caller={caller_phone} business={business_id}"
-                )
 
                 # Load business voice config
                 from app.db.session import SessionLocal
@@ -243,43 +234,71 @@ async def voice_stream(websocket: WebSocket):
                 # Create DB records and AI session
                 await orchestrator.initialize_call(voice_session)
 
-                # Connect to Deepgram STT
-                vc         = voice_session.voice_config
-                dg_stream  = DeepgramStream(
-                    on_final_transcript = on_final_transcript,
-                    language            = vc.get("language", "en-IN"),
-                    endpointing_ms      = vc.get("endpointing_ms", 300),
-                )
-                connected = await dg_stream.connect()
-                if not connected:
-                    print("[Gateway] Warning: Deepgram not connected — STT will not work")
+                vc = voice_session.voice_config
 
-                # Send greeting (non-blocking so media loop continues)
-                asyncio.create_task(
-                    orchestrator.send_greeting(voice_session, websocket)
-                )
+                # Block inbound STT until greeting finishes (avoid early LISTENING race).
+                voice_session.state = VoiceState.SPEAKING
+
+                # IMPORTANT: Do NOT open Deepgram until after the greeting.
+                # If we connect Deepgram then block audio for several seconds during TTS,
+                # Deepgram's WebSocket idles and closes with 1011 keepalive ping timeout —
+                # then every send() fails and you never get transcripts.
+                async def greeting_then_stt() -> None:
+                    nonlocal dg_stream
+                    await orchestrator.send_greeting(voice_session, websocket)
+                    voice_session.state = VoiceState.PROCESSING
+                    dg_stream = DeepgramStream(
+                        on_final_transcript=on_final_transcript,
+                        language=vc.get("language", "en-IN"),
+                        endpointing_ms=vc.get("endpointing_ms", 300),
+                    )
+                    ok = await dg_stream.connect()
+                    voice_session.state = VoiceState.LISTENING
+                    if not ok:
+                        stt_pipeline_log.warning("Deepgram not connected — STT will not work")
+
+                asyncio.create_task(greeting_then_stt())
 
             # ── media ────────────────────────────────────────────────
             elif event == "media":
+                media = msg.get("media") or {}
+                # Twilio: inbound = caller mic; outbound = optional return leg — only STT inbound
+                track = media.get("track")
+                if track is not None and track != "inbound":
+                    continue
                 if (
                     dg_stream
                     and voice_session
                     and voice_session.state == VoiceState.LISTENING
                 ):
                     try:
-                        audio = base64.b64decode(msg["media"]["payload"])
+                        audio = base64.b64decode(media["payload"])
+                        chunk_meta = {
+                            "mulaw_bytes": len(audio),
+                            "track": track,
+                            "sequenceNumber": media.get("sequenceNumber"),
+                            "chunk": media.get("chunk"),
+                            "timestamp": media.get("timestamp"),
+                        }
+                        line = f"Twilio→Deepgram {json.dumps(chunk_meta, default=str)}"
+                        n = getattr(voice_session, "_twilio_dg_chunks_sent", 0)
+                        voice_session._twilio_dg_chunks_sent = n + 1
+                        if VOICE_STT_LOG_EACH_CHUNK or n == 0:
+                            stt_pipeline_log.info(line)
+                        else:
+                            stt_pipeline_log.debug(line)
                         await dg_stream.send(audio)
                     except Exception as exc:
-                        print(f"[Gateway] Audio forward error: {exc}")
+                        stt_pipeline_log.warning("Twilio→Deepgram send failed: %s", exc)
+                elif voice_session:
+                    pass
 
             # ── stop ─────────────────────────────────────────────────
             elif event == "stop":
-                sid = voice_session.call_sid if voice_session else "unknown"
-                print(f"[Gateway] Stream stopped: call_sid={sid}")
                 break
 
     except Exception as exc:
-        print(f"[Gateway] Unexpected WebSocket error: {exc}")
+        stt_pipeline_log.warning("Voice stream error: %s", exc)
 
     finally:
         # ── Teardown ────────────────────────────────────────────────
@@ -301,4 +320,3 @@ async def voice_stream(websocket: WebSocket):
             await orchestrator.end_call(voice_session)
             voice_session_manager.remove(voice_session.call_sid)
 
-        print("[Gateway] Connection fully cleaned up")

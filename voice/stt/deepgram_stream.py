@@ -16,9 +16,12 @@ Configuration:
 """
 
 import asyncio
+import logging
 from typing import Callable, Awaitable
 
 from app.config import DEEPGRAM_API_KEY
+
+stt_pipeline_log = logging.getLogger("voice.stt.pipeline")
 
 
 class DeepgramStream:
@@ -39,7 +42,7 @@ class DeepgramStream:
     async def connect(self) -> bool:
         """Open Deepgram live transcription WebSocket. Returns True on success."""
         if not DEEPGRAM_API_KEY:
-            print("[STT] DEEPGRAM_API_KEY not configured — transcription disabled.")
+            stt_pipeline_log.warning("DEEPGRAM_API_KEY not configured — transcription disabled.")
             return False
 
         try:
@@ -77,15 +80,15 @@ class DeepgramStream:
                         return
 
                     if result.speech_final:
-                        print(f"[STT] speech_final: {text!r}")
+                        stt_pipeline_log.info("Deepgram→app speech_final: %s", text)
                         await _on_final(text)
                     elif result.is_final:
-                        print(f"[STT] is_final:     {text!r}")
+                        stt_pipeline_log.info("Deepgram→app is_final: %s", text)
                 except Exception as exc:
-                    print(f"[STT] Message handler error: {exc}")
+                    stt_pipeline_log.warning("Deepgram message handler error: %s", exc)
 
             async def _on_error(event_type, error, **kwargs):  # noqa: ANN001
-                print(f"[STT] Deepgram error: {error}")
+                stt_pipeline_log.warning("Deepgram error: %s", error)
 
             self._connection.on(EventType.MESSAGE, _on_message)
             self._connection.on(EventType.ERROR,   _on_error)
@@ -97,11 +100,10 @@ class DeepgramStream:
             )
 
             self._connected = True
-            print(f"[STT] Deepgram connected (lang={self._language}, ep={self._endpointing}ms)")
             return True
 
         except Exception as exc:
-            print(f"[STT] Deepgram connect error: {exc}")
+            stt_pipeline_log.warning("Deepgram connect error: %s", exc)
             return False
 
     async def send(self, audio: bytes) -> None:
@@ -111,7 +113,7 @@ class DeepgramStream:
         try:
             await self._connection.send_media(audio)
         except Exception as exc:
-            print(f"[STT] Send error: {exc}")
+            stt_pipeline_log.warning("Deepgram send error: %s", exc)
 
     async def finish(self) -> None:
         """Signal end of audio stream and close Deepgram connection."""
@@ -120,7 +122,7 @@ class DeepgramStream:
             try:
                 await self._connection.send_close_stream()
             except Exception as exc:
-                print(f"[STT] Close stream error: {exc}")
+                stt_pipeline_log.warning("Deepgram close stream error: %s", exc)
 
         if self._listen_task is not None:
             try:
