@@ -13,7 +13,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 EMBEDDING_MODEL = "text-embedding-3-small"
 CHEAP_MODEL = "gpt-4o-mini"
-SMART_MODEL = "gpt-4.1"
+SMART_MODEL = "gpt-5.4-mini"
 EMBEDDING_DIMENSIONS = 1536
 
 # LLM Provider — "openai" (default) or "groq"
@@ -37,3 +37,9 @@ SERVER_BASE_URL = os.getenv("SERVER_BASE_URL", "http://localhost:8000")
 
 # Log every Twilio→Deepgram chunk at INFO (very verbose). Default: first chunk INFO, rest DEBUG.
 VOICE_STT_LOG_EACH_CHUNK = os.getenv("VOICE_STT_LOG_EACH_CHUNK", "").lower() in ("1", "true", "yes")
+
+# ElevenLabs Conversational AI — HTTP tools (PSTN agent → your API)
+# Set a long random secret; send as header X-Agent-Key from ElevenLabs webhook tools.
+ELEVENLABS_AGENT_TOOL_SECRET = os.getenv("ELEVENLABS_AGENT_TOOL_SECRET", "")
+# After running scripts/create_elevenlabs_receptionist_agent.py, you can store the id here for reference.
+ELEVENLABS_CONVAI_AGENT_ID = os.getenv("ELEVENLABS_CONVAI_AGENT_ID", "")

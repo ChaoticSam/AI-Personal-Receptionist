@@ -1,11 +1,14 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
-import os
-from dotenv import load_dotenv
 
-load_dotenv()
+from app.config import DATABASE_URL
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL is not set. Add it to a .env file in the project root, for example:\n"
+        "  DATABASE_URL=postgresql+psycopg2://USER:PASSWORD@localhost:5432/DATABASE_NAME\n"
+        "Then start PostgreSQL (or use your host’s connection string) and run the app again."
+    )
 
 engine = create_engine(
     DATABASE_URL,
