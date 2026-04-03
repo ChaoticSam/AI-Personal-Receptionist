@@ -23,7 +23,7 @@ export default function Sidebar() {
 
   function handleLogout() {
     logout()
-    navigate('/login')
+    navigate('/')
   }
 
   return (
