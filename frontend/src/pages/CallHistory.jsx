@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { PhoneMissed, PhoneIncoming, Loader2 } from 'lucide-react'
+import { PhoneMissed, PhoneIncoming, Loader2, FileText } from 'lucide-react'
 import { getCalls } from '../services/api'
+import CallTranscriptModal from '../components/CallTranscriptModal'
 
 const statusConfig = {
   received: { icon: PhoneIncoming, color: '#22c55e', bg: 'rgba(34,197,94,0.12)',  label: 'Received' },
@@ -19,11 +20,19 @@ function formatTime(isoStr) {
   return new Date(isoStr).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
 }
 
+function formatDuration(secs) {
+  if (secs == null || secs === '') return '—'
+  const n = Number(secs)
+  if (Number.isNaN(n)) return '—'
+  return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`
+}
+
 export default function CallHistory() {
   const [calls, setCalls]     = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter]   = useState('all')
   const [error, setError]     = useState(null)
+  const [openCallId, setOpenCallId] = useState(null)
 
   useEffect(() => {
     getCalls()
@@ -66,7 +75,7 @@ export default function CallHistory() {
           <table style={styles.table}>
             <thead>
               <tr>
-                {['Status', 'Phone', 'Customer', 'Date', 'Time', 'Duration', 'Linked Order'].map(h => (
+                {['Status', 'Phone', 'Customer', 'Date', 'Time', 'Duration', 'Linked Order', 'Transcript'].map(h => (
                   <th key={h} style={styles.th}>{h}</th>
                 ))}
               </tr>
@@ -76,7 +85,13 @@ export default function CallHistory() {
                 const cfg = statusConfig[call.status] || statusConfig.received
                 const Icon = cfg.icon
                 return (
-                  <tr key={call.id} style={styles.tr}>
+                  <tr
+                    key={call.id}
+                    style={styles.trClickable}
+                    onClick={() => setOpenCallId(call.id)}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
                     <td style={styles.td}>
                       <div style={{ ...styles.statusChip, background: cfg.bg }}>
                         <Icon size={13} color={cfg.color} />
@@ -87,12 +102,20 @@ export default function CallHistory() {
                     <td style={{ ...styles.td, fontWeight: 500 }}>{call.customer_name || 'Unknown'}</td>
                     <td style={{ ...styles.td, color: 'var(--color-text-muted)' }}>{formatDate(call.created_at)}</td>
                     <td style={{ ...styles.td, color: 'var(--color-text-muted)' }}>{formatTime(call.created_at)}</td>
-                    <td style={{ ...styles.td, color: 'var(--color-text-muted)' }}>{call.duration || '—'}</td>
+                    <td style={{ ...styles.td, color: 'var(--color-text-muted)' }}>{formatDuration(call.duration)}</td>
                     <td style={styles.td}>
                       {call.linked_order_id
                         ? <span style={styles.orderLink}>{String(call.linked_order_id).slice(0, 8).toUpperCase()}</span>
                         : <span style={{ color: 'var(--color-text-muted)' }}>—</span>
                       }
+                    </td>
+                    <td style={styles.td}>
+                      <button
+                        style={styles.viewBtn}
+                        onClick={e => { e.stopPropagation(); setOpenCallId(call.id) }}
+                      >
+                        <FileText size={13} /> View
+                      </button>
                     </td>
                   </tr>
                 )
@@ -101,6 +124,8 @@ export default function CallHistory() {
           </table>
         )}
       </div>
+
+      <CallTranscriptModal callId={openCallId} onClose={() => setOpenCallId(null)} />
     </div>
   )
 }
@@ -137,7 +162,17 @@ const styles = {
     borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface-2)',
   },
   tr: { borderBottom: '1px solid var(--color-border)' },
+  trClickable: {
+    borderBottom: '1px solid var(--color-border)',
+    cursor: 'pointer', transition: 'background 0.12s ease', background: 'transparent',
+  },
   td: { padding: '13px 16px', fontSize: 14, color: 'var(--color-text)' },
+  viewBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    padding: '5px 11px', borderRadius: 8, cursor: 'pointer',
+    background: 'var(--color-primary-soft)', color: 'var(--color-primary)',
+    border: '1px solid var(--color-primary)', fontSize: 12, fontWeight: 500,
+  },
   statusChip: {
     display: 'inline-flex', alignItems: 'center', gap: 5,
     padding: '4px 10px', borderRadius: 99,

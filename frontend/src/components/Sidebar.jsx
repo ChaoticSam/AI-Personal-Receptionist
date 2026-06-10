@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, ClipboardList,
-  PhoneCall, BotMessageSquare, LogOut, Settings
+  PhoneCall, BotMessageSquare, LogOut, Settings, Radio
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -10,7 +10,8 @@ const navItems = [
   { to: '/products',  icon: ShoppingBag,     label: 'Products' },
   { to: '/orders',    icon: ClipboardList,   label: 'Orders' },
   { to: '/calls',     icon: PhoneCall,       label: 'Call History' },
-  { to: '/profile',   icon: Settings,        label: 'Settings' },
+  { to: '/profile',    icon: Settings,        label: 'Settings' },
+  { to: '/voice-test', icon: Radio,           label: 'Voice Test' },
 ]
 
 function getInitials(name = '') {

@@ -17,5 +17,10 @@ class Business(Base):
     address = Column(String)
     voice_config = Column(JSONB, nullable=True, default=dict)
 
+    # Per-tenant ElevenLabs Conversational AI (each business = own agent in ElevenLabs)
+    elevenlabs_agent_id = Column(String(128), nullable=True)
+    convai_llm_model = Column(String(128), nullable=True)
+    convai_voice_id = Column(String(128), nullable=True)
+
     created_at = Column(DateTime, nullable=False, default=func.now())
     updated_at = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())

@@ -45,6 +45,7 @@ export const updateOrderStatus = (id, status)     => api.patch(`/orders/${id}/st
 
 // Calls
 export const getCalls         = ()          => api.get('/calls')
+export const getCall          = (id)        => api.get(`/calls/${id}`)
 export const logIncomingCall  = (phone, businessId, callerName) =>
   api.post('/calls/incoming', null, { params: { phone, business_id: businessId, caller_name: callerName } })
 
@@ -53,7 +54,8 @@ export const registerBusiness = (data)         => api.post('/business/register',
 export const getBusiness      = (id)            => api.get(`/business/${id}`)
 export const updateBusiness   = (id, data)      => api.patch(`/business/${id}`, data)
 
-// Voice
+// ElevenLabs (tenant agent settings)
 export const getElevenLabsVoices = () => api.get('/voice/voices')
+export const getConvaiLlmModels = () => api.get('/voice/llm-models')
 
 export default api

@@ -10,6 +10,7 @@ import Products from './pages/Products'
 import Orders from './pages/Orders'
 import CallHistory from './pages/CallHistory'
 import Profile from './pages/Profile'
+import VoiceTest from './pages/VoiceTest'
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
             <Route path="/orders" element={<Orders />} />
             <Route path="/calls" element={<CallHistory />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/voice-test" element={<VoiceTest />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

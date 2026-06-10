@@ -5,7 +5,9 @@ from pgvector.sqlalchemy import Vector
 import uuid
 
 from app.db.session import Base
-from app.config import EMBEDDING_DIMENSIONS
+
+# Legacy table (embeddings no longer generated — kept for existing DB rows)
+_EMBED_DIM = 1536
 
 
 class ProductEmbedding(Base):
@@ -14,8 +16,7 @@ class ProductEmbedding(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     product_id = Column(UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
     business_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    # EMBEDDING_DIMENSIONS-dim vector from EMBEDDING_MODEL
-    embedding = Column(Vector(EMBEDDING_DIMENSIONS), nullable=False)
+    embedding = Column(Vector(_EMBED_DIM), nullable=False)
     # The text that was embedded — useful for debugging
     embed_text = Column(Text, nullable=False)
 

@@ -1,20 +1,17 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from uuid import UUID
 from datetime import datetime
 
 
-class VoiceConfig(BaseModel):
-    silence_threshold_ms: Optional[int] = 1000    # ms of silence before AI responds (200–3000)
-    endpointing_ms: Optional[int] = 300            # Deepgram endpointing delay (100–800)
-    vad_sensitivity: Optional[str] = "medium"      # low | medium | high
-    tts_voice_id: Optional[str] = None             # ElevenLabs voice ID
-    tts_voice_name: Optional[str] = None           # ElevenLabs voice display name
-    language: Optional[str] = "en-IN"              # STT language hint
-    greeting_message: Optional[str] = None         # What AI says when call connects
+class AgentUiConfig(BaseModel):
+    """UI-only fields synced to ElevenLabs (first message, language). No STT/VAD — ConvAI handles that."""
+
+    first_message: Optional[str] = None
+    language: Optional[str] = Field(default="en", description="ISO language code for the agent")
 
     class Config:
-        extra = "allow"
+        extra = "ignore"
 
 
 class BusinessCreate(BaseModel):
@@ -32,7 +29,11 @@ class BusinessUpdate(BaseModel):
     whatsapp_number: Optional[str] = None
     timezone: Optional[str] = None
     address: Optional[str] = None
-    voice_config: Optional[VoiceConfig] = None
+    # ElevenLabs ConvAI — one agent ID per tenant
+    elevenlabs_agent_id: Optional[str] = None
+    convai_llm_model: Optional[str] = None
+    convai_voice_id: Optional[str] = None
+    agent_ui: Optional[AgentUiConfig] = None
 
 
 class BusinessResponse(BaseModel):
@@ -43,7 +44,10 @@ class BusinessResponse(BaseModel):
     whatsapp_number: Optional[str] = None
     timezone: Optional[str] = None
     address: Optional[str] = None
-    voice_config: Optional[VoiceConfig] = None
+    elevenlabs_agent_id: Optional[str] = None
+    convai_llm_model: Optional[str] = None
+    convai_voice_id: Optional[str] = None
+    agent_ui: Optional[AgentUiConfig] = None
     created_at: datetime
     updated_at: datetime
 

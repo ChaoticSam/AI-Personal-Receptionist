@@ -13,6 +13,10 @@ class ResolveContextRequest(BaseModel):
     to_number: str = Field(..., description="Twilio number that was dialed (E.164)")
     from_number: str = Field(..., description="Caller number (E.164)")
     call_sid: Optional[str] = Field(None, description="Twilio CallSid when available")
+    conversation_id: Optional[str] = Field(
+        None,
+        description="ElevenLabs conversation id (pass system__conversation_id) — links the call to its transcript",
+    )
 
 
 class ResolveContextResponse(BaseModel):

@@ -7,11 +7,10 @@ pydantic[email]
 alembic
 python-jose[cryptography]
 bcrypt
-openai
 pgvector
-dateparser
 twilio
-deepgram-sdk
 httpx
 python-multipart
-groq
+websockets
+openai
+anthropic

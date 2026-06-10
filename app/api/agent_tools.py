@@ -1,33 +1,4 @@
-"""
-HTTP tools for ElevenLabs Conversational AI (PSTN via Twilio native integration).
-
-Auth: every request must send header `X-Agent-Key: <ELEVENLABS_AGENT_TOOL_SECRET>`.
-
-ElevenLabs agent setup (webhook tools, method POST, JSON body):
-  1. {PUBLIC_BASE_URL}/agent/tools/resolve_context
-     Body: to_number, from_number, optional call_sid (Twilio CallSid).
-     Returns: business_id, customer_id, call_id, business_name.
-  2. {PUBLIC_BASE_URL}/agent/tools/list_products
-     Body: business_id
-  3. {PUBLIC_BASE_URL}/agent/tools/prepare_order
-     Body: business_id, call_id, customer_id, optional product_id, quantity,
-           order_notes, custom_fields (object — use keys from product.required_custom_field_names).
-  4. {PUBLIC_BASE_URL}/agent/tools/place_order
-     Body: business_id, call_id, customer_id, customer_confirmed (must be true),
-           idempotency_key (unique string per place attempt), product_id, quantity,
-           optional order_notes, custom_fields.
-     Only call after the caller explicitly confirms (e.g. says yes).
-  5. {PUBLIC_BASE_URL}/agent/tools/append_call_notes
-     Body: business_id, call_id, text (transcript snippet or summary).
-
-Database: run scripts/sql/agent_order_drafts.sql on Postgres before first use.
-
-Create the ElevenLabs agent (prompt + webhook tools) in code:
-  python scripts/create_elevenlabs_receptionist_agent.py
-"""
-
 from __future__ import annotations
-
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
@@ -145,6 +116,11 @@ def agent_resolve_context(
             caller_phone=payload.from_number.strip(),
             call_sid=payload.call_sid,
         )
+
+    # Link the ElevenLabs conversation so we can fetch its transcript later.
+    if payload.conversation_id and call.conversation_id != payload.conversation_id:
+        call.conversation_id = payload.conversation_id.strip()
+        db.commit()
 
     return ResolveContextResponse(
         ok=True,
