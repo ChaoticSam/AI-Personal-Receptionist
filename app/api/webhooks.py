@@ -71,6 +71,33 @@ def _verify_signature(raw_body: bytes, sig_header: str | None) -> bool:
     return hmac.compare_digest(expected, received)
 
 
+def _caller_phone(data: dict) -> str | None:
+    """The customer's number for this call, from the webhook metadata."""
+    phone = (data.get("metadata") or {}).get("phone_call") or {}
+    caller = phone.get("external_number")
+    return caller.strip() if caller else None
+
+
+def _ensure_customer_linked(db: Session, call: Call, data: dict) -> None:
+    """
+    Find-or-create the caller in our customer DB by phone and link them to the
+    call. Runs for every matched call (not just freshly created ones), so a call
+    matched by conversation_id also gets its customer resolved/backfilled.
+    """
+    caller = _caller_phone(data) or (call.caller_phone or "").strip()
+    if not caller or caller == "unknown":
+        return
+
+    # Backfill the call's caller number if it was a placeholder.
+    if call.caller_phone in (None, "", "unknown"):
+        call.caller_phone = caller
+
+    customer = find_or_create_customer(db, business_id=call.business_id, phone=caller)
+    if call.customer_id != customer.id:
+        call.customer_id = customer.id
+    db.commit()
+
+
 def _find_call(db: Session, data: dict) -> Call | None:
     conversation_id = data.get("conversation_id")
 
@@ -149,6 +176,7 @@ async def elevenlabs_post_call(
                 data.get("conversation_id"),
             )
             return {"ok": True, "matched": False}
+        _ensure_customer_linked(db, call, data)
         save_transcript_from_conversation(db, call, data)
         logger.info(
             "post_call webhook: stored transcript for call %s (conversation %s)",
